@@ -6,7 +6,7 @@ APP_NAME="sharetube"
 APP_DIR="/opt/$APP_NAME"
 PORT=5000
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
-SCRIPT_SOURCE="sharetube.py"
+SCRIPT_SOURCE="main.py"
 
 function install_sharetube() {
     echo "🔧 Проверка установки Python..."
