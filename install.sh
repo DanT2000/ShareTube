@@ -4,9 +4,9 @@ set -e
 
 APP_NAME="sharetube"
 APP_DIR="/opt/$APP_NAME"
-GIT_REPO="https://github.com/DanT2000/ShareTube.git"
-PORT=80
+PORT=5000
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
+SCRIPT_SOURCE="sharetube.py"
 
 function install_sharetube() {
     echo "🔧 Проверка установки Python..."
@@ -21,11 +21,11 @@ function install_sharetube() {
     echo "📂 Создаем директорию $APP_DIR..."
     sudo mkdir -p "$APP_DIR"
     sudo chown "$USER":"$USER" "$APP_DIR"
-    cd "$APP_DIR"
 
-    echo "📥 Клонируем репозиторий ShareTube..."
-    git clone "$GIT_REPO" .
-    rm -rf .git
+    echo "📄 Копируем скрипт $SCRIPT_SOURCE в $APP_DIR..."
+    cp "$SCRIPT_SOURCE" "$APP_DIR/"
+
+    cd "$APP_DIR"
 
     echo "🐍 Создаем виртуальное окружение..."
     python3 -m venv venv
@@ -33,7 +33,7 @@ function install_sharetube() {
     echo "🚀 Активируем виртуальное окружение и устанавливаем зависимости..."
     source venv/bin/activate
     pip install --upgrade pip
-    pip install -r requirements.txt
+    pip install pytelegrambotapi yt-dlp flask
     deactivate
 
     echo "🌐 Открываем порт $PORT через iptables..."
