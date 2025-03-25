@@ -17,7 +17,8 @@ function install_sharetube() {
     else
         echo "✅ Python уже установлен."
     fi
-
+    echo "🎞️ Устанавливаем ffmpeg..."
+    sudo apt install -y ffmpeg
     echo "📂 Создаем директорию $APP_DIR..."
     sudo mkdir -p "$APP_DIR"
     sudo chown "$USER":"$USER" "$APP_DIR"
