@@ -1,0 +1,3 @@
+pytelegrambotapi
+yt-dlp
+flask
