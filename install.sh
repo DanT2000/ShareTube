@@ -2,7 +2,7 @@
 
 set -e
 
-APP_NAME="sharetube"
+APP_NAME="ShareTube"
 APP_DIR="/opt/$APP_NAME"
 PORT=5000
 SERVICE_FILE="/etc/systemd/system/${APP_NAME}.service"
@@ -51,7 +51,7 @@ After=network.target
 [Service]
 User=$USER
 WorkingDirectory=$APP_DIR
-ExecStart=$APP_DIR/venv/bin/python $APP_DIR/sharetube.py
+ExecStart=$APP_DIR/venv/bin/python $APP_DIR/$SCRIPT_SOURCE
 Restart=always
 
 [Install]
@@ -65,7 +65,7 @@ EOF
     sudo systemctl start $APP_NAME
 
     echo "✅ Установка завершена!"
-    echo "⚠️ Не забудьте отредактировать файл $APP_DIR/sharetube.py и указать свой Telegram-токен и IP-адрес в самом начале."
+    echo "⚠️ Не забудь отредактировать файл $APP_DIR/$SCRIPT_SOURCE и указать свой Telegram-токен и IP-адрес в самом начале."
     echo "📦 Приложение работает как служба: systemctl status $APP_NAME"
 }
 
