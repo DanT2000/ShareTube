@@ -1,0 +1,41 @@
+# --- secrets / temporary access (NEVER commit) ---
+config.txt
+cookies.txt
+*.cookies.txt
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+id_ed25519*
+
+# --- legacy originals in repo root (redacted copies live in legacy/) ---
+/main.py
+/main.py.bak
+/proxy.py
+
+# --- runtime data ---
+downloads/
+storage/
+data/
+*.log
+
+# --- python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# --- node ---
+node_modules/
+apps/frontend/dist/
+.vite/
+
+# --- misc ---
+.DS_Store
+Thumbs.db

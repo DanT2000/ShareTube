@@ -1,0 +1,29 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ShareTube">
+  <defs>
+    <linearGradient id="stGrad" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="0.55" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="stGloss" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- rounded-square gradient tile -->
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#stGrad)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#stGloss)"/>
+  <!-- share links (drawn under the nodes) -->
+  <g stroke="#ffffff" stroke-width="24" stroke-linecap="round" opacity="0.95">
+    <line x1="196" y1="238" x2="330" y2="164"/>
+    <line x1="196" y1="274" x2="330" y2="348"/>
+  </g>
+  <!-- two share destination nodes -->
+  <g fill="#ffffff">
+    <circle cx="356" cy="150" r="42"/>
+    <circle cx="356" cy="362" r="42"/>
+  </g>
+  <!-- source node = play button -->
+  <circle cx="176" cy="256" r="60" fill="#ffffff"/>
+  <path d="M160 228c0-8.9 9.7-14.4 17.3-9.8l44 26.6c7.4 4.5 7.4 15.2 0 19.7l-44 26.6C169.7 321.4 160 315.9 160 307v-79z" fill="#4f46e5"/>
+</svg>

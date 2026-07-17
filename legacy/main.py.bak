@@ -1,0 +1,185 @@
+﻿# # РџР°СЂР°РјРµС‚СЂС‹ Р±РѕС‚Р°
+# BOT_TOKEN = "<REDACTED_BOT_TOKEN>"
+
+# # РџР°СЂР°РјРµС‚СЂС‹ СЃРµСЂРІРµСЂР°
+# SERVER_IP = "188.18.55.140"  # РёР»Рё СѓРєР°Р¶РёС‚Рµ РІРЅРµС€РЅРёР№ IP, РµСЃР»Рё СЃРµСЂРІРµСЂ РґРѕСЃС‚СѓРїРµРЅ РёР·РІРЅРµ
+# SERVER_LOCAL_IP = "127.0.0.1"
+# SERVER_PORT = 8080
+# РњР°РєСЃРёРјР°Р»СЊРЅС‹Р№ СЂР°Р·РјРµСЂ РїР°РїРєРё РІ Р±Р°Р№С‚Р°С… (3 Р“Р‘)
+LOCAL_COOKIES_NAME = "cookies.txt"   # "" -> Р°РІС‚Рѕ-РїРѕРёСЃРє
+
+# main.py
+# =========================
+# ===== РќРђРЎРўР РћР™РљР Р’Р’Р•Р РҐРЈ ==
+# =========================
+BOT_TOKEN = "<REDACTED_BOT_TOKEN>"
+
+# РџР°РїРєР° РґР»СЏ С„Р°Р№Р»РѕРІ Рё РїСѓР±Р»РёС‡РЅР°СЏ СЃСЃС‹Р»РєР° (СЂР°Р·РґР°С‘С‚ nginx РЅР° С‚РІРѕС‘Рј Windows)
+BASE_PUBLIC_URL = "http://188.18.55.140:53123"
+
+# Р›РёРјРёС‚ РѕС‚РїСЂР°РІРєРё Р±РѕС‚РѕРј (РѕР±Р»Р°С‡РЅС‹Р№ Bot API ~50MB; Р»РѕРєР°Р»СЊРЅС‹Р№ Bot API --local = 2GB)
+MAX_TG_BYTES = 50 * 1024 * 1024
+
+# РҐСЂР°РЅРёР»РёС‰Рµ РѕРіСЂР°РЅРёС‡РёРІР°РµРј РїРѕ СЃСѓРјРјР°СЂРЅРѕРјСѓ СЂР°Р·РјРµСЂСѓ (РЅР°РїСЂ., 3 Р“Р‘)
+MAX_FOLDER_SIZE = 3 * 1024 * 1024 * 1024
+
+# РџСЂРѕРєСЃРё С‚РѕР»СЊРєРѕ РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ YouTube (РµСЃР»Рё РЅСѓР¶РЅРѕ; РёРЅР°С‡Рµ РѕСЃС‚Р°РІСЊ РїСѓСЃС‚Рѕ)
+YDL_HTTP_PROXY ="http://ShareTube:<REDACTED>@104.164.54.51:59140"
+
+# СЃРµС‚РµРІС‹Рµ С„РѕР»Р±СЌРєРё (РѕСЃС‚Р°РІСЊ РєР°Рє РµСЃС‚СЊ)
+FORCE_IPV4_FALLBACK = True
+DISABLE_PROXY_ON_FINAL_TRY = True
+# РўР°Р№РјР°СѓС‚С‹/СЂРµС‚СЂР°Рё РґР»СЏ yt-dlp
+DL_SOCKET_TIMEOUT = 30
+DL_RETRIES = 10
+DL_FRAG_RETRIES = 15
+# =========================
+# dl_test.py
+# ============= РќРђРЎРўР РћР™РљР =============
+DOWNLOAD_DIR = r"D:\Program\ShareTube\downloads"  # РєСѓРґР° РєР»Р°СЃС‚СЊ С„Р°Р№Р»С‹
+LOCAL_COOKIES_NAME = "cookies.txt"               # С„Р°Р№Р» СЂСЏРґРѕРј СЃРѕ СЃРєСЂРёРїС‚РѕРј; "" в†’ Р°РІС‚Рѕ-РїРѕРёСЃРє
+YDL_HTTP_PROXY = ""                              # РЅР°РїСЂ. "http://user:pass@host:port" РёР»Рё РїСѓСЃС‚Рѕ
+
+# Р”Р»СЏ СѓРґРѕР±РЅРѕРіРѕ Р·Р°РїСѓСЃРєР° Р±РµР· Р°СЂРіСѓРјРµРЅС‚Р° РјРѕР¶РЅРѕ СЃСЂР°Р·Сѓ Р·Р°РґР°С‚СЊ:
+TEST_URL ="https://www.youtube.com/watch?v=xbawFdBypkI"
+
+# РЎРµС‚РµРІС‹Рµ С„РѕР»Р±СЌРєРё (РѕСЃС‚Р°РІСЊ РєР°Рє РµСЃС‚СЊ)
+FORCE_IPV4_FALLBACK = True
+DISABLE_PROXY_ON_FINAL_TRY = True
+
+# РўР°Р№РјР°СѓС‚С‹/СЂРµС‚СЂР°Рё
+DL_SOCKET_TIMEOUT = 10
+DL_RETRIES = 3
+DL_FRAG_RETRIES = 5
+
+# =====================================
+
+from pathlib import Path
+import tempfile
+import sys
+import yt_dlp
+from yt_dlp.utils import DownloadError
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DOWNLOAD_PATH = Path(DOWNLOAD_DIR)
+DOWNLOAD_PATH.mkdir(parents=True, exist_ok=True)
+
+# ---- cookies: РёС‰РµРј Р»РѕРєР°Р»СЊРЅС‹Р№ С„Р°Р№Р» СЂСЏРґРѕРј СЃРѕ СЃРєСЂРёРїС‚РѕРј ----
+COOKIES_CANDIDATES = ("cookies.txt", "www.youtube.com_cookies.txt", "youtube_cookies.txt")
+def find_local_cookies() -> str:
+    if LOCAL_COOKIES_NAME:
+        p = SCRIPT_DIR / LOCAL_COOKIES_NAME
+        return str(p) if p.is_file() and p.stat().st_size > 0 else ""
+    for name in COOKIES_CANDIDATES:
+        p = SCRIPT_DIR / name
+        if p.is_file() and p.stat().st_size > 0:
+            return str(p)
+    return ""
+
+# ---- РѕСЃРЅРѕРІРЅРѕР№ Р·Р°РіСЂСѓР·С‡РёРє СЃ С„РѕР»Р±СЌРєР°РјРё С„РѕСЂРјР°С‚РѕРІ Рё СЃРµС‚Рё ----
+def ydl_download_with_fallback(url: str) -> Path:
+    """
+    РЎРєР°С‡РёРІР°РµС‚ url РІ СѓРЅРёРєР°Р»СЊРЅСѓСЋ РїРѕРґРїР°РїРєСѓ РІРЅСѓС‚СЂРё DOWNLOAD_DIR.
+    Р’РѕР·РІСЂР°С‰Р°РµС‚ РїСѓС‚СЊ Рє РёС‚РѕРіРѕРІРѕРјСѓ С„Р°Р№Р»Сѓ (СЃР°РјРѕРјСѓ СЃРІРµР¶РµРјСѓ).
+    Р‘СЂРѕСЃР°РµС‚ РёСЃРєР»СЋС‡РµРЅРёРµ РїСЂРё РЅРµСѓРґР°С‡Рµ.
+    """
+    tmpdir = Path(tempfile.mkdtemp(prefix="ytdl_", dir=str(DOWNLOAD_PATH)))
+    outtmpl = str(tmpdir / "%(title).120s.%(ext)s")
+
+    base = {
+        "quiet": True,
+        "no_warnings": True,
+        "socket_timeout": DL_SOCKET_TIMEOUT,
+        "retries": DL_RETRIES,
+        "fragment_retries": DL_FRAG_RETRIES,
+        "geo_bypass": True,
+        "extractor_args": {"youtube": {"player_client": ["android", "ios"]}},
+        "outtmpl": outtmpl,
+        "restrictfilenames": True,
+    }
+    if YDL_HTTP_PROXY:
+        base["proxy"] = YDL_HTTP_PROXY
+    cookies_path = find_local_cookies()
+    if cookies_path:
+        base["cookiefile"] = cookies_path
+
+    # Р¤РѕСЂРјР°С‚С‹: РїСЂРѕРіСЂРµСЃСЃРёРІРЅС‹Р№ в†’ СЂР°Р·РґРµР»СЊРЅС‹Рµ РґРѕСЂРѕР¶РєРё в†’ best
+    selectors = [
+    "bv*+ba/b",   # в†ђ РїРѕСЃС‚Р°РІРёС‚СЊ РїРµСЂРІС‹Рј
+    "b[ext=mp4]/b",
+    "best",
+]
+
+
+    # РЎРµС‚РµРІС‹Рµ РїСЂРѕС„РёР»Рё: СѓРјРµРЅСЊС€Р°РµРј С‡Р°РЅРєРё/РїР°СЂР°Р»Р»РµР»РёР·Рј, IPv4 РЅР° РїРѕР·РґРЅРёС… РїРѕРїС‹С‚РєР°С…
+    net_profiles = [
+        {"http_chunk_size": 1 * 1024 * 1024, "concurrent_fragment_downloads": 1,
+        "forceipv4": FORCE_IPV4_FALLBACK, "ratelimit": 3 * 1024 * 1024},
+        {"http_chunk_size": 5 * 1024 * 1024, "concurrent_fragment_downloads": 1},
+        {},  # РґРµС„РѕР»С‚ вЂ” РІ СЃР°РјРѕРј РєРѕРЅС†Рµ
+    ]
+
+    last_err = None
+    for sel in selectors:
+        for net in net_profiles:
+            opts = base | {"format": sel} | net
+            try:
+                print(f"[info] try format='{sel}', net={net or 'default'}")
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.extract_info(url, download=True)
+                # СѓСЃРїРµС… в†’ Р±РµСЂС‘Рј СЃР°РјС‹Р№ СЃРІРµР¶РёР№ С„Р°Р№Р»
+                files = sorted(tmpdir.rglob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
+                for f in files:
+                    if f.is_file():
+                        return f
+                raise DownloadError("Р¤Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ РїРѕСЃР»Рµ Р·Р°РіСЂСѓР·РєРё")
+            except Exception as e:
+                last_err = e
+                msg = str(e)
+                if "Requested format is not available" in msg:
+                    print(f"[warn] С„РѕСЂРјР°С‚ '{sel}' РЅРµРґРѕСЃС‚СѓРїРµРЅ, РїСЂРѕР±СѓРµРј РґСЂСѓРіРѕР№вЂ¦")
+                    break  # Рє СЃР»РµРґСѓСЋС‰РµРјСѓ СЃРµР»РµРєС‚РѕСЂСѓ
+                else:
+                    print(f"[warn] СЃР±РѕР№ РЅР° '{sel}' СЃ РїСЂРѕС„РёР»РµРј {net or 'default'}: {msg}")
+
+        # С„РёРЅР°Р»СЊРЅР°СЏ РїРѕРїС‹С‚РєР° Р±РµР· РїСЂРѕРєСЃРё (РµСЃР»Рё РїСЂРѕРєСЃРё Р·Р°РґР°РЅ)
+        if DISABLE_PROXY_ON_FINAL_TRY and YDL_HTTP_PROXY:
+            try:
+                opts_no_proxy = base | {"format": sel}
+                opts_no_proxy.pop("proxy", None)
+                opts_no_proxy |= {"http_chunk_size": 1 * 1024 * 1024,
+                                  "concurrent_fragment_downloads": 1,
+                                  "forceipv4": FORCE_IPV4_FALLBACK,
+                                  "ratelimit": 3 * 1024 * 1024}
+                print(f"[info] С„РёРЅР°Р»СЊРЅР°СЏ РїРѕРїС‹С‚РєР° Р±РµР· РїСЂРѕРєСЃРё, format='{sel}'")
+                with yt_dlp.YoutubeDL(opts_no_proxy) as ydl:
+                    ydl.extract_info(url, download=True)
+                files = sorted(tmpdir.rglob("*"), key=lambda p: p.stat().st_mtime, reverse=True)
+                for f in files:
+                    if f.is_file():
+                        return f
+                raise DownloadError("Р¤Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ РїРѕСЃР»Рµ Р·Р°РіСЂСѓР·РєРё (no-proxy)")
+            except Exception as e2:
+                last_err = e2
+                print(f"[warn] Р±РµР· РїСЂРѕРєСЃРё С‚РѕР¶Рµ РЅРµ СѓРґР°Р»РѕСЃСЊ: {e2}")
+
+    raise last_err if last_err else DownloadError("РќРµ СѓРґР°Р»РѕСЃСЊ СЃРєР°С‡Р°С‚СЊ РЅРё РѕРґРЅРёРј СЃРїРѕСЃРѕР±РѕРј")
+
+# ---- С‚РѕС‡РєР° РІС…РѕРґР° ----
+if __name__ == "__main__":
+    url = TEST_URL or (sys.argv[1] if len(sys.argv) > 1 else "")
+    if not url:
+        print("ERROR: РїСѓСЃС‚РѕР№ URL")
+        sys.exit(1)
+
+    ck = find_local_cookies()
+    print(f"[info] cookies: {'FOUND '+ck if ck else 'РЅРµС‚ (СЃРєР°С‡РёРІР°РЅРёРµ Р±РµР· cookies)'}")
+    if YDL_HTTP_PROXY:
+        print(f"[info] proxy: {YDL_HTTP_PROXY}")
+
+    try:
+        out = ydl_download_with_fallback(url)
+        print(f"OK: С„Р°Р№Р» СЃРѕС…СЂР°РЅС‘РЅ в†’ {out}")
+    except Exception as e:
+        print(f"ERROR: {e}")
+

@@ -1,0 +1,15 @@
+# Local development overrides: exposes postgres/redis for debugging and mounts source.
+# Usage: docker compose -f docker-compose.yml -f infra/docker-compose.dev.yml up
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5433:5432"
+  redis:
+    ports:
+      - "127.0.0.1:6380:6379"
+  app:
+    environment:
+      ENV: dev
+      LOG_JSON: "false"
+    volumes:
+      - ../apps/backend/app:/app/app

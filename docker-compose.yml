@@ -1,0 +1,127 @@
+# ShareTube — production Docker Compose (Coolify-ready).
+# Only the `app` service is published (port 8989 + domain via Coolify proxy).
+# postgres, redis, xray and the local bot api are NEVER exposed to the internet.
+
+x-app-image: &app-image
+  build:
+    context: .
+    dockerfile: apps/backend/Dockerfile
+  image: sharetube-app:latest
+  env_file: .env
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sharetube}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-sharetube}
+    volumes:
+      - st_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sharetube}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [st_net]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - st_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [st_net]
+
+  xray:
+    build:
+      context: .
+      dockerfile: services/xray/Dockerfile
+    image: sharetube-xray:latest
+    restart: unless-stopped
+    environment:
+      XRAY_OUTBOUND_URI: ${XRAY_OUTBOUND_URI:-}
+      XRAY_CONFIG_JSON: ${XRAY_CONFIG_JSON:-}
+    networks: [st_net]
+
+  app:
+    <<: *app-image
+    command: ["api"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    ports:
+      - "${APP_PORT:-8989}:8989"
+    volumes:
+      - st_storage:/data/storage
+      - st_tmp:/data/tmp
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8989/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks: [st_net]
+
+  worker:
+    <<: *app-image
+    command: ["worker"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      xray: {condition: service_started}
+    volumes:
+      - st_storage:/data/storage
+      - st_tmp:/data/tmp
+    networks: [st_net]
+
+  bot:
+    <<: *app-image
+    command: ["bot"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      app: {condition: service_started}
+    networks: [st_net]
+
+  # Optional Local Bot API server. Enable with: docker compose --profile localbotapi up
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    profiles: ["localbotapi"]
+    restart: unless-stopped
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_LOCAL: "1"
+    command: ["--local", "--dir=/data/storage"]
+    volumes:
+      - st_storage:/data/storage
+      - st_botapi:/var/lib/telegram-bot-api
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8081/ || true"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [st_net]
+
+volumes:
+  st_pgdata:
+  st_redis:
+  st_storage:
+  st_tmp:
+  st_botapi:
+
+networks:
+  st_net:
+    driver: bridge
+    driver_opts:
+      # Lower MTU avoids a black-hole on the Xray/Reality tunnel where small
+      # payloads pass but large transfers stall (broken path-MTU discovery upstream).
+      com.docker.network.driver.mtu: "1400"

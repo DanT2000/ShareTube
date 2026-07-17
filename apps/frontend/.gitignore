@@ -1,0 +1,8 @@
+# Frontend-local ignores (repo root .gitignore also covers these)
+node_modules/
+dist/
+dist-ssr/
+.vite/
+coverage/
+*.local
+.eslintcache

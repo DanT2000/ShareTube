@@ -1,0 +1,28 @@
+# Overlay that wires the ShareTube `app` service into Coolify's existing Traefik proxy
+# for domain routing + automatic Let's Encrypt TLS. Does NOT touch other Coolify apps.
+#
+# Deploy: docker compose -f docker-compose.yml -f infra/docker-compose.coolify.yml up -d
+#
+# Traefik on this host: entrypoints http(:80)/https(:443), certresolver "letsencrypt"
+# (HTTP-01 challenge), docker provider with exposedbydefault=false, network "coolify".
+services:
+  app:
+    networks: [st_net, coolify]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+      # HTTP -> HTTPS redirect
+      - "traefik.http.routers.sharetube-http.rule=Host(`sharetube.appswire.ru`)"
+      - "traefik.http.routers.sharetube-http.entrypoints=http"
+      - "traefik.http.routers.sharetube-http.middlewares=sharetube-redirect"
+      - "traefik.http.middlewares.sharetube-redirect.redirectscheme.scheme=https"
+      # HTTPS router with Let's Encrypt
+      - "traefik.http.routers.sharetube.rule=Host(`sharetube.appswire.ru`)"
+      - "traefik.http.routers.sharetube.entrypoints=https"
+      - "traefik.http.routers.sharetube.tls=true"
+      - "traefik.http.routers.sharetube.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sharetube.loadbalancer.server.port=8989"
+
+networks:
+  coolify:
+    external: true

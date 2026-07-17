@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /$
+Disallow: /admin
+Disallow: /api/
+Disallow: /download/
+
+Sitemap: https://sharetube.appswire.ru/sitemap.xml
