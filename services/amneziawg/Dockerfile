@@ -12,12 +12,12 @@ RUN go install github.com/artem-russkikh/wireproxy-awg/cmd/wireproxy@latest \
     && cp /go/bin/wireproxy /out-wireproxy
 
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out-wireproxy /usr/bin/wireproxy
 COPY services/amneziawg/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 EXPOSE 1080
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD sh -c "exec 3<>/dev/tcp/127.0.0.1/1080" 2>/dev/null || exit 1
+    CMD nc -z 127.0.0.1 1080 || exit 1
 ENTRYPOINT ["/entrypoint.sh"]
