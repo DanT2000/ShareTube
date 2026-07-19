@@ -2,7 +2,7 @@
 
 Production-ready сервис загрузки медиа по ссылке: Telegram-бот + адаптивное веб-приложение + Telegram Mini App + backend API + очередь фоновых задач + downloader workers + временное хранилище + админка. Источники не ограничены YouTube — архитектура расширяемая (yt-dlp, gallery-dl, прямые файлы и др.).
 
-> Продолжение прежнего монолитного скрипта ShareTube. Что найдено и перенесено — см. [LEGACY_AUDIT.md](LEGACY_AUDIT.md).
+> Продолжение прежнего монолитного скрипта ShareTube. Что найдено и перенесено — см. [docs/LEGACY_AUDIT.md](docs/LEGACY_AUDIT.md).
 
 ## Возможности
 
@@ -25,18 +25,19 @@ Frontend: React + TypeScript + Vite, адаптивная вёрстка, PWA, T
 ## Структура репозитория
 
 ```
-apps/backend      FastAPI-приложение, модели, миграции, worker (ARQ), Telegram-бот
+apps/backend      FastAPI-приложение, модели, миграции, ARQ-worker и Telegram-бот
+                    (api / worker / bot — один образ, разные команды запуска: см. entrypoint.sh)
 apps/frontend     React + Vite (веб, PWA, Mini App)
-apps/bot          (бот запускается из apps/backend/app/tgbot.py тем же образом)
-workers/downloader (ARQ worker — app.worker в том же образе)
 services/xray     Xray sidecar (генерация конфига из URI, SOCKS5/HTTP inbound)
-services/telegram-bot-api  Опциональный Local Bot API (официальный образ)
-infra             dev/coolify overlay для docker-compose
+infra             docker-compose overlays: dev и coolify (домен + HTTPS)
 scripts           first-run, deploy, backup, restore, update-tools, cleanup, health-check
 tests             pytest: SSRF, filenames, delivery, initData, signed urls, extractor, storage, queue, API
-docs              инструкции (бот, api_id/hash, Local Bot API, домен/HTTPS, proxy, cookies, восстановление)
-legacy            копии старого скрипта (секреты отредактированы)
+docs              инструкции + отчёты (аудиты, деплой, безопасность, эксплуатация)
+docker-compose.yml   production-стек (postgres, redis, xray, app, worker, bot, опц. local bot api)
 ```
+
+Local Telegram Bot API — опциональный официальный образ, включается профилем compose
+(`--profile localbotapi`), отдельная папка не нужна.
 
 ## Быстрый старт (локально / на сервере)
 
@@ -77,7 +78,8 @@ cd tests && python -m pytest -q      # 51 тест: SSRF, delivery routing, init
 - [Cookies profiles](docs/cookies.md)
 - [Восстановление после сбоя](docs/recovery.md)
 - [Архитектура](docs/architecture.md)
-- [Эксплуатация (OPERATIONS)](OPERATIONS.md), [Безопасность (SECURITY_NOTES)](SECURITY_NOTES.md)
+- [Эксплуатация (OPERATIONS)](docs/OPERATIONS.md), [Безопасность (SECURITY_NOTES)](docs/SECURITY_NOTES.md)
+- [Отчёт о развёртывании (DEPLOYMENT_REPORT)](docs/DEPLOYMENT_REPORT.md), [сеть](docs/NETWORK_AUDIT.md), [сервер](docs/SERVER_AUDIT.md)
 
 ## Безопасность
 
