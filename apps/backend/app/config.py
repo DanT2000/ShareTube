@@ -76,7 +76,10 @@ class Settings(BaseSettings):
 
     # --- outbound / proxy ---
     OUTBOUND_REQUIRED: bool = True  # never fall back to direct on proxy failure
-    XRAY_SOCKS_URL: str = "socks5h://xray:1080"
+    # Primary outbound: AmneziaWG obfuscated tunnel (bypasses upstream throttling that
+    # kills the plain Xray/Reality route). XRAY_SOCKS_URL names the seeded primary socks.
+    XRAY_SOCKS_URL: str = "socks5h://amneziawg:1080"
+    XRAY_BACKUP_SOCKS_URL: str = "socks5h://xray:1080"
     YTDLP_PROXY_URL: str = ""
     GALLERY_DL_PROXY_URL: str = ""
     DIRECT_DOWNLOAD_PROXY_URL: str = ""

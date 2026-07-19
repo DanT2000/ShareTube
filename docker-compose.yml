@@ -24,7 +24,7 @@ x-app-env: &app-env
   TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
   TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS:-}
   TELEGRAM_API_BASE: ${TELEGRAM_API_BASE:-https://api.telegram.org}
-  TELEGRAM_PROXY_URL: ${TELEGRAM_PROXY_URL:-socks5://xray:1080}
+  TELEGRAM_PROXY_URL: ${TELEGRAM_PROXY_URL:-socks5://amneziawg:1080}
   LOCAL_BOT_API_ENABLED: ${LOCAL_BOT_API_ENABLED:-false}
   LOCAL_BOT_API_BASE: ${LOCAL_BOT_API_BASE:-http://telegram-bot-api:8081}
   TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
@@ -52,7 +52,8 @@ x-app-env: &app-env
   S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
   S3_SECRET_KEY: ${S3_SECRET_KEY:-}
   OUTBOUND_REQUIRED: ${OUTBOUND_REQUIRED:-true}
-  XRAY_SOCKS_URL: ${XRAY_SOCKS_URL:-socks5h://xray:1080}
+  XRAY_SOCKS_URL: ${XRAY_SOCKS_URL:-socks5h://amneziawg:1080}
+  XRAY_BACKUP_SOCKS_URL: ${XRAY_BACKUP_SOCKS_URL:-socks5h://xray:1080}
   YTDLP_PROXY_URL: ${YTDLP_PROXY_URL:-}
   GALLERY_DL_PROXY_URL: ${GALLERY_DL_PROXY_URL:-}
   DIRECT_DOWNLOAD_PROXY_URL: ${DIRECT_DOWNLOAD_PROXY_URL:-}
@@ -115,6 +116,19 @@ services:
       XRAY_CONFIG_JSON: ${XRAY_CONFIG_JSON:-}
     networks: [st_net]
 
+  # AmneziaWG (obfuscated WireGuard) userspace SOCKS5 gateway — no TUN/priv needed.
+  # Primary outbound when the plain Xray/Reality route is throttled by the upstream.
+  amneziawg:
+    build:
+      context: .
+      dockerfile: services/amneziawg/Dockerfile
+    image: sharetube-amneziawg:latest
+    restart: unless-stopped
+    environment:
+      # base64 of the AmneziaWG client config (kept out of git; set in .env / Coolify)
+      AWG_CONFIG: ${AWG_CONFIG:-}
+    networks: [st_net]
+
   app:
     <<: *app-image
     command: ["api"]
@@ -141,6 +155,7 @@ services:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
       xray: {condition: service_started}
+      amneziawg: {condition: service_started}
     volumes:
       - st_storage:/data/storage
       - st_tmp:/data/tmp

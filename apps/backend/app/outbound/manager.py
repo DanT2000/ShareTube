@@ -137,15 +137,26 @@ async def ensure_seed_profile(session: AsyncSession) -> None:
         return
     if not settings.XRAY_SOCKS_URL:
         return
-    row = ProxyProfile(
-        name="xray-main", kind="xray", enabled=True, is_primary=True, priority=10,
+    # Primary: AmneziaWG obfuscated tunnel (settings.XRAY_SOCKS_URL points at its socks).
+    session.add(ProxyProfile(
+        name="amneziawg-main", kind="xray", enabled=True, is_primary=True, priority=10,
         encrypted_config=encrypt(settings.XRAY_SOCKS_URL),
-        display_meta={"protocol": "xray", "host": "xray", "port": "1080", "has_auth": False},
+        display_meta={"protocol": "amneziawg-socks", "host": "amneziawg", "port": "1080",
+                      "has_auth": False},
         last_status="unknown",
-    )
-    session.add(row)
+    ))
+    # Backup: plain Xray/Reality socks, used only if the primary route fails.
+    backup = getattr(settings, "XRAY_BACKUP_SOCKS_URL", "")
+    if backup:
+        session.add(ProxyProfile(
+            name="xray-backup", kind="socks5", enabled=True, is_backup=True, priority=50,
+            encrypted_config=encrypt(backup),
+            display_meta={"protocol": "xray-socks", "host": "xray", "port": "1080",
+                          "has_auth": False},
+            last_status="unknown",
+        ))
     await session.flush()
-    log.info("seed_outbound_profile", name="xray-main")
+    log.info("seed_outbound_profile", primary="amneziawg-main", backup="xray-backup")
 
 
 async def run_check(session: AsyncSession, row: ProxyProfile) -> None:
