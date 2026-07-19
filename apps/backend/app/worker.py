@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as aioredis
 from arq import cron
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .config import settings
 from .db import SessionLocal
@@ -140,11 +140,21 @@ async def analyze_job(ctx, job_id: str) -> None:
             session.add(MediaItem(source_id=src.id, position=it.position, kind=it.kind, url=it.url,
                                   filename=it.filename, width=it.width, height=it.height,
                                   duration_sec=it.duration_sec))
+        # Auto-flow: bot jobs download immediately with the best "auto" format —
+        # no quality picker, the user just gets the ready video.
+        if job.deliver_to_telegram and not job.selected_format_id:
+            fmts = (await session.execute(
+                select(SelectedFormat).where(SelectedFormat.source_id == src.id)
+            )).scalars().all()
+            auto = next((f for f in fmts if f.label == "auto"), fmts[0] if fmts else None)
+            if auto:
+                job.selected_format_id = auto.id
+                job.approx_size_bytes = auto.approx_size_bytes
+
         await jobs_svc.transition(session, job, JobStatus.ANALYZED, stage="analyzed", progress=0.0)
         await session.commit()
         await publish_progress(job_id, {"job_id": job_id, "status": "analyzed", "stage": "analyzed"})
 
-        # bot-origin jobs with an auto choice may be auto-started by the bot after showing card
         if job.deliver_to_telegram and job.selected_format_id:
             from .queue import enqueue_download
             await enqueue_download(job_id)
@@ -483,17 +493,33 @@ async def cleanup_cron(ctx) -> None:
 
 
 async def recover_stale_cron(ctx) -> None:
-    """Fail jobs stuck downloading past the timeout (crashed worker recovery)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=settings.JOB_TIMEOUT_MINUTES + 5)
+    """Recover jobs orphaned by a worker restart/crash.
+
+    - Downloading/merging/converting/uploading past the job timeout -> failed(timeout).
+    - Stuck in pending/analyzing/queued with no heartbeat for >10 min -> failed(timeout),
+      so a stale job never permanently blocks re-submission of the same link (dedup).
+    """
+    now = datetime.now(timezone.utc)
+    dl_cutoff = now - timedelta(minutes=settings.JOB_TIMEOUT_MINUTES + 5)
+    early_cutoff = now - timedelta(minutes=10)
+    active_late = [JobStatus.DOWNLOADING.value, JobStatus.MERGING.value,
+                   JobStatus.CONVERTING.value, JobStatus.UPLOADING.value]
+    early = [JobStatus.PENDING.value, JobStatus.ANALYZING.value, JobStatus.QUEUED.value]
     async with SessionLocal() as session:
-        rows = (await session.execute(
+        late_rows = (await session.execute(
             select(DownloadJob).where(
-                DownloadJob.status.in_([JobStatus.DOWNLOADING.value, JobStatus.MERGING.value,
-                                        JobStatus.CONVERTING.value, JobStatus.UPLOADING.value]),
-                DownloadJob.started_at < cutoff)
+                DownloadJob.status.in_(active_late),
+                DownloadJob.started_at < dl_cutoff)
         )).scalars().all()
-        for job in rows:
+        early_rows = (await session.execute(
+            select(DownloadJob).where(
+                DownloadJob.status.in_(early),
+                func.coalesce(DownloadJob.heartbeat_at, DownloadJob.created_at) < early_cutoff)
+        )).scalars().all()
+        for job in [*late_rows, *early_rows]:
             await jobs_svc.fail_job(session, job, "timeout")
+        if late_rows or early_rows:
+            log.info("recover_stale", late=len(late_rows), early=len(early_rows))
         await session.commit()
 
 
@@ -509,7 +535,7 @@ class WorkerSettings:
     functions = [analyze_job, download_job]
     cron_jobs = [
         cron(cleanup_cron, minute=set(range(0, 60, 15))),
-        cron(recover_stale_cron, minute=set(range(5, 60, 10))),
+        cron(recover_stale_cron, minute=set(range(0, 60, 5))),
     ]
     on_startup = _startup
     on_shutdown = _shutdown

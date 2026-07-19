@@ -2,6 +2,8 @@
 config.txt
 cookies.txt
 *.cookies.txt
+*cookies*.txt
+*_cookies.txt
 .env
 .env.*
 !.env.example

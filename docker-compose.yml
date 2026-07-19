@@ -52,6 +52,7 @@ x-app-env: &app-env
   S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
   S3_SECRET_KEY: ${S3_SECRET_KEY:-}
   OUTBOUND_REQUIRED: ${OUTBOUND_REQUIRED:-true}
+  POT_PROVIDER_URL: ${POT_PROVIDER_URL:-http://pot-provider:4416}
   XRAY_SOCKS_URL: ${XRAY_SOCKS_URL:-socks5h://amneziawg:1080}
   XRAY_BACKUP_SOCKS_URL: ${XRAY_BACKUP_SOCKS_URL:-socks5h://xray:1080}
   YTDLP_PROXY_URL: ${YTDLP_PROXY_URL:-}
@@ -116,6 +117,13 @@ services:
       XRAY_CONFIG_JSON: ${XRAY_CONFIG_JSON:-}
     networks: [st_net]
 
+  # YouTube PO-token provider (bgutil). yt-dlp's plugin fetches a token from here so
+  # YouTube returns real formats even from a datacenter IP. Internal only.
+  pot-provider:
+    image: brainicism/bgutil-ytdlp-pot-provider:latest
+    restart: unless-stopped
+    networks: [st_net]
+
   # AmneziaWG (obfuscated WireGuard) userspace SOCKS5 gateway — no TUN/priv needed.
   # Primary outbound when the plain Xray/Reality route is throttled by the upstream.
   amneziawg:
@@ -156,6 +164,7 @@ services:
       redis: {condition: service_healthy}
       xray: {condition: service_started}
       amneziawg: {condition: service_started}
+      pot-provider: {condition: service_started}
     volumes:
       - st_storage:/data/storage
       - st_tmp:/data/tmp

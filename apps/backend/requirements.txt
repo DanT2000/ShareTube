@@ -15,6 +15,8 @@ yt-dlp>=2026.7.4
 gallery-dl>=1.29.0
 httpx==0.28.1
 socksio==1.0.0
+PySocks==1.7.1
+requests[socks]==2.32.3
 python-multipart==0.0.20
 itsdangerous==2.2.0
 structlog==24.4.0

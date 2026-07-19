@@ -27,7 +27,7 @@ from .db import SessionLocal
 from .deps import _get_or_create_user_by_telegram
 from .logging_config import get_logger
 from .models import DownloadJob, JobStatus, SelectedFormat
-from .queue import enqueue_analyze, enqueue_download, request_cancel
+from .queue import enqueue_analyze, enqueue_download, publish_progress, request_cancel
 from .services import jobs as jobs_svc
 from .services.serialize import load_job
 
@@ -108,34 +108,62 @@ async def on_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Доступ ограничен.")
         return
 
+    chat_id = update.effective_chat.id
+    # Auto flow: user sends a link and just gets the ready video back.
     async with SessionLocal() as session:
         try:
             job = await jobs_svc.create_job(session, user_id=user_id, raw_url=text, origin="bot")
         except jobs_svc.JobError as exc:
-            await update.message.reply_text(f"❌ {exc.message}")
-            return
+            if exc.code == "duplicate":
+                # a previous (possibly stuck) job for this link is still active —
+                # cancel it and start fresh instead of blocking the user.
+                await _cancel_active_for_url(session, user_id, text)
+                await session.commit()
+                try:
+                    job = await jobs_svc.create_job(session, user_id=user_id, raw_url=text, origin="bot")
+                except jobs_svc.JobError as exc2:
+                    await update.message.reply_text(f"❌ {exc2.message}")
+                    return
+            else:
+                await update.message.reply_text(f"❌ {exc.message}")
+                return
         job.deliver_to_telegram = True
-        job.tg_chat_id = update.effective_chat.id
+        job.tg_chat_id = chat_id
         await session.commit()
         job_id = job.id
 
-    msg = await update.message.reply_text("🔍 Анализирую ссылку…")
+    # delete the user's link message (best-effort; ignored if not permitted)
+    with contextlib.suppress(Exception):
+        await context.bot.delete_message(chat_id, update.message.message_id)
+
+    status = await context.bot.send_message(chat_id, "🔍 Обрабатываю ссылку…")
+    async with SessionLocal() as session:
+        job = await session.get(DownloadJob, job_id)
+        job.tg_progress_message_id = status.message_id
+        await session.commit()
+
     await enqueue_analyze(job_id)
-    # wait for analysis result (bounded)
-    for _ in range(60):
-        await asyncio.sleep(1.0)
-        async with SessionLocal() as session:
-            job = await load_job(session, job_id)
-            if not job:
-                break
-            if job.status == JobStatus.ANALYZED.value:
-                await _show_card(context, job, msg.chat_id, msg.message_id)
-                return
-            if job.status == JobStatus.FAILED.value:
-                await context.bot.edit_message_text(f"❌ {job.error_message}", msg.chat_id, msg.message_id)
-                return
-    await context.bot.edit_message_text("⏱ Анализ занял слишком много времени. Попробуйте ещё раз.",
-                                        msg.chat_id, msg.message_id)
+    # one status message tracks the whole job (analysis -> download -> delivery)
+    asyncio.create_task(_track_progress(context, chat_id, status.message_id, job_id))
+
+
+async def _cancel_active_for_url(session, user_id: int, raw_url: str) -> None:
+    from .security.ssrf import UrlValidationError, validate_url
+    try:
+        norm = validate_url(raw_url).normalized
+    except UrlValidationError:
+        return
+    rows = (await session.execute(
+        select(DownloadJob).where(
+            DownloadJob.user_id == user_id,
+            DownloadJob.normalized_url == norm,
+            DownloadJob.status.in_(jobs_svc.ACTIVE_STATUSES),
+        )
+    )).scalars().all()
+    for j in rows:
+        await request_cancel(j.id)
+        j.error_code = "cancelled"
+        await jobs_svc.transition(session, j, JobStatus.CANCELLED, stage="cancelled")
 
 
 async def _show_card(context, job, chat_id, message_id):
@@ -194,17 +222,18 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _start_download(context, query, job_id, int(fmt_id))
     elif data.startswith("cancel:"):
         job_id = data.split(":", 1)[1]
-        await request_cancel(job_id)
+        await request_cancel(job_id)  # worker checks this flag mid-download
         async with SessionLocal() as session:
             job = await session.get(DownloadJob, job_id)
+            # cancel pre-download states immediately; active downloads stop on the flag
             if job and job.status in (JobStatus.ANALYZED.value, JobStatus.QUEUED.value,
-                                      JobStatus.PENDING.value):
+                                      JobStatus.PENDING.value, JobStatus.ANALYZING.value):
                 job.error_code = "cancelled"
                 await jobs_svc.transition(session, job, JobStatus.CANCELLED, stage="cancelled")
                 await session.commit()
+                await publish_progress(job_id, {"job_id": job_id, "status": "cancelled"})
         with contextlib.suppress(Exception):
-            await query.edit_message_caption("🚫 Отменено.") if query.message.caption else \
-                await query.edit_message_text("🚫 Отменено.")
+            await query.edit_message_reply_markup(None)
     elif data.startswith("resend:"):
         job_id = data.split(":", 1)[1]
         await _resend(context, query, job_id)
@@ -241,6 +270,7 @@ async def _track_progress(context, chat_id, message_id, job_id):
     pubsub = r.pubsub()
     await pubsub.subscribe(f"progress:{job_id}")
     last_text = ""
+    cancel_kb = InlineKeyboardMarkup([[InlineKeyboardButton("❌ Отмена", callback_data=f"cancel:{job_id}")]])
     try:
         deadline = settings.JOB_TIMEOUT_MINUTES * 60
         waited = 0
@@ -252,6 +282,7 @@ async def _track_progress(context, chat_id, message_id, job_id):
             data = json.loads(msg["data"])
             status = data.get("status")
             stage = STAGE_TEXT.get(data.get("stage") or status, status)
+            terminal = status in ("done", "failed", "cancelled")
             if status == "downloading":
                 pct = data.get("progress") or 0.0
                 bar_len = 12
@@ -274,9 +305,11 @@ async def _track_progress(context, chat_id, message_id, job_id):
                 text = stage or "…"
             if text != last_text:
                 with contextlib.suppress(Exception):
-                    await context.bot.edit_message_text(text, chat_id, message_id)
+                    await context.bot.edit_message_text(
+                        text, chat_id, message_id,
+                        reply_markup=None if terminal else cancel_kb)
                 last_text = text
-            if status in ("done", "failed", "cancelled"):
+            if terminal:
                 break
     finally:
         with contextlib.suppress(Exception):

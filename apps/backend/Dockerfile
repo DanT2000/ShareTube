@@ -11,6 +11,10 @@ RUN npm run build
 # ---------- stage 2: python runtime ----------
 FROM python:3.12-slim AS runtime
 
+# Deno JS runtime — required by recent yt-dlp to solve YouTube's player (nsig)
+# challenge; without it YouTube returns no formats.
+COPY --from=denoland/deno:bin /deno /usr/local/bin/deno
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
@@ -24,6 +28,9 @@ WORKDIR /app
 
 COPY apps/backend/requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
+# yt-dlp PO-token plugin (talks to the bgutil pot-provider service) — bypasses the
+# YouTube datacenter-IP "no formats" bot-check.
+RUN pip install --no-cache-dir bgutil-ytdlp-pot-provider
 
 COPY apps/backend/app ./app
 COPY apps/backend/alembic.ini ./alembic.ini

@@ -23,6 +23,14 @@ from .sources import YTDLP_SOURCES, detect_source, guess_content_type
 log = get_logger("ytdlp")
 YTDLP_BIN = os.getenv("YTDLP_BIN", "yt-dlp")
 
+
+def _pot_args() -> list[str]:
+    """Extractor args to use the bgutil PO-token provider (bypasses YouTube bot-check)."""
+    from ..config import settings
+    if not settings.POT_PROVIDER_URL:
+        return []
+    return ["--extractor-args", f"youtubepot-bgutilhttp:base_url={settings.POT_PROVIDER_URL}"]
+
 # Height presets -> yt-dlp format selector. Prefer ready H.264/AAC MP4 (no transcode).
 _HEIGHT_SELECTOR = (
     "bv*[height<={h}][ext=mp4][vcodec^=avc]+ba[ext=m4a]/"
@@ -40,7 +48,7 @@ class YtDlpExtractor(MediaExtractor):
     async def fetch_metadata(self, url: str, *, proxy_url: str | None,
                              cookies_path: str | None = None) -> MediaMetadata:
         argv = [YTDLP_BIN, "-J", "--no-warnings", "--no-playlist",
-                "--socket-timeout", "30", "--no-download"]
+                "--socket-timeout", "30", "--no-download", *_pot_args()]
         if proxy_url:
             argv += ["--proxy", proxy_url]
         if cookies_path:
@@ -146,6 +154,7 @@ class YtDlpExtractor(MediaExtractor):
             "--progress-template",
             "download:PROGRESS %(progress.downloaded_bytes)s %(progress.total_bytes)s "
             "%(progress.total_bytes_estimate)s %(progress.speed)s %(progress.eta)s",
+            *_pot_args(),
         ]
         if fmt.audio_only:
             argv += ["-f", fmt.format_selector or "ba/bestaudio",
@@ -196,6 +205,12 @@ class YtDlpExtractor(MediaExtractor):
 
     def _classify(self, stderr: str) -> ExtractError:
         s = stderr.lower()
+        if "requested format is not available" in s or "no video formats found" in s or \
+                "no formats" in s:
+            return ExtractError(
+                "no_formats",
+                "Источник не отдал форматы для этого видео (возможно, ограничение YouTube "
+                "или требуется другой доступ). Попробуйте другое видео.")
         if "unsupported url" in s or "no video" in s:
             return ExtractError("unsupported", "Эта ссылка не поддерживается.")
         if "private" in s or "login required" in s or "sign in" in s or "authentication" in s:

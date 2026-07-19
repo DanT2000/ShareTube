@@ -76,6 +76,9 @@ class Settings(BaseSettings):
 
     # --- outbound / proxy ---
     OUTBOUND_REQUIRED: bool = True  # never fall back to direct on proxy failure
+    # YouTube PO-token provider (bgutil) — lets yt-dlp bypass the datacenter-IP
+    # "no formats / bot check". Empty disables it.
+    POT_PROVIDER_URL: str = "http://pot-provider:4416"
     # Primary outbound: AmneziaWG obfuscated tunnel (bypasses upstream throttling that
     # kills the plain Xray/Reality route). XRAY_SOCKS_URL names the seeded primary socks.
     XRAY_SOCKS_URL: str = "socks5h://amneziawg:1080"
