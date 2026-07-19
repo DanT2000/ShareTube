@@ -54,18 +54,39 @@ async def run(argv: list[str], *, timeout: int, env: dict | None = None,
         cwd=cwd,
         preexec_fn=preexec,
         creationflags=creationflags,
+        # yt-dlp -J emits a single huge JSON line; the default 64KB StreamReader limit
+        # makes readline() raise "chunk exceed the limit". Raise it well above any
+        # metadata blob so long/4K videos with many formats parse fine.
+        limit=64 * 1024 * 1024,
     )
 
     stdout_chunks: list[bytes] = []
     stderr_chunks: list[bytes] = []
 
-    async def _pump(stream, chunks, is_progress):
+    async def _pump_stdout(stream, chunks):
+        # Read stdout in raw chunks (not lines) — it may be one giant JSON with no newline.
         while True:
-            line = await stream.readline()
+            data = await stream.read(65536)
+            if not data:
+                break
+            chunks.append(data)
+
+    async def _pump_progress(stream, chunks):
+        # Progress goes to stderr as newline-delimited lines.
+        while True:
+            try:
+                line = await stream.readline()
+            except (ValueError, asyncio.LimitOverrunError):
+                # over-long stderr line: drain the rest in chunks, keep going
+                data = await stream.read(65536)
+                if not data:
+                    break
+                chunks.append(data)
+                continue
             if not line:
                 break
             chunks.append(line)
-            if is_progress and line_callback:
+            if line_callback:
                 try:
                     line_callback(line.decode("utf-8", "replace").rstrip())
                 except Exception:  # progress must never crash the download
@@ -74,8 +95,8 @@ async def run(argv: list[str], *, timeout: int, env: dict | None = None,
     try:
         await asyncio.wait_for(
             asyncio.gather(
-                _pump(proc.stdout, stdout_chunks, False),
-                _pump(proc.stderr, stderr_chunks, True),
+                _pump_stdout(proc.stdout, stdout_chunks),
+                _pump_progress(proc.stderr, stderr_chunks),
                 proc.wait(),
             ),
             timeout=timeout,

@@ -109,6 +109,12 @@ async def analyze_job(ctx, job_id: str) -> None:
             await session.commit()
             await publish_progress(job_id, {"job_id": job_id, "status": "failed", "error": exc.message})
             return
+        except Exception as exc:  # noqa: BLE001 — never leave a job stuck in "analyzing"
+            log.error("analyze_job_error", job_id=job_id, error=str(exc), error_type=type(exc).__name__)
+            await jobs_svc.fail_job(session, job, "extract_failed")
+            await session.commit()
+            await publish_progress(job_id, {"job_id": job_id, "status": "failed", "error": job.error_message})
+            return
         finally:
             if cookies:
                 _safe_remove(cookies)
