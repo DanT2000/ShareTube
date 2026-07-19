@@ -1,13 +1,77 @@
-# ShareTube — production Docker Compose (Coolify-ready).
-# Only the `app` service is published (port 8989 + domain via Coolify proxy).
-# postgres, redis, xray and the local bot api are NEVER exposed to the internet.
+# ShareTube — production Docker Compose (Coolify-ready + plain `docker compose`).
+# Only the `app` service is published (port 8989 + domain via reverse proxy).
+# postgres, redis, xray and the optional local bot api are NEVER exposed to the internet.
+#
+# Env source:
+#   - plain docker compose: values come from a local `.env` (auto-loaded for ${VAR}).
+#   - Coolify: values come from the resource's Environment Variables (injected).
+# No service depends on an `.env` FILE being present inside the build — everything is
+# passed explicitly via `environment` below, so it works in both modes.
+
+x-app-env: &app-env
+  ENV: ${ENV:-prod}
+  APP_PORT: ${APP_PORT:-8989}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://sharetube.appswire.ru}
+  SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_JSON: ${LOG_JSON:-true}
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-sharetube}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sharetube}}
+  DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql+psycopg2://${POSTGRES_USER:-sharetube}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sharetube}}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  BOT_TOKEN: ${BOT_TOKEN:?set BOT_TOKEN}
+  BOT_USERNAME: ${BOT_USERNAME:-sharetube_bot}
+  TELEGRAM_USE_WEBHOOK: ${TELEGRAM_USE_WEBHOOK:-false}
+  TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+  TELEGRAM_ADMIN_IDS: ${TELEGRAM_ADMIN_IDS:-}
+  TELEGRAM_API_BASE: ${TELEGRAM_API_BASE:-https://api.telegram.org}
+  TELEGRAM_PROXY_URL: ${TELEGRAM_PROXY_URL:-socks5://xray:1080}
+  LOCAL_BOT_API_ENABLED: ${LOCAL_BOT_API_ENABLED:-false}
+  LOCAL_BOT_API_BASE: ${LOCAL_BOT_API_BASE:-http://telegram-bot-api:8081}
+  TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+  TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+  CLOUD_BOT_SAFE_LIMIT_MB: ${CLOUD_BOT_SAFE_LIMIT_MB:-45}
+  LOCAL_BOT_SAFE_LIMIT_MB: ${LOCAL_BOT_SAFE_LIMIT_MB:-1900}
+  MAX_DOWNLOAD_SIZE_MB: ${MAX_DOWNLOAD_SIZE_MB:-10000}
+  DOWNLOAD_LINK_TTL_HOURS: ${DOWNLOAD_LINK_TTL_HOURS:-24}
+  MAX_ACTIVE_JOBS_PER_USER: ${MAX_ACTIVE_JOBS_PER_USER:-2}
+  MAX_QUEUED_JOBS_PER_USER: ${MAX_QUEUED_JOBS_PER_USER:-5}
+  MAX_GLOBAL_DOWNLOADS: ${MAX_GLOBAL_DOWNLOADS:-3}
+  MAX_GLOBAL_TRANSCODES: ${MAX_GLOBAL_TRANSCODES:-1}
+  MAX_PLAYLIST_ITEMS: ${MAX_PLAYLIST_ITEMS:-20}
+  JOB_TIMEOUT_MINUTES: ${JOB_TIMEOUT_MINUTES:-120}
+  MAX_URL_LENGTH: ${MAX_URL_LENGTH:-2048}
+  PLAYLISTS_ENABLED: ${PLAYLISTS_ENABLED:-false}
+  STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+  STORAGE_DIR: ${STORAGE_DIR:-/data/storage}
+  TMP_DIR: ${TMP_DIR:-/data/tmp}
+  MAX_STORAGE_GB: ${MAX_STORAGE_GB:-5}
+  DOWNLOAD_RATE_LIMIT_KBPS: ${DOWNLOAD_RATE_LIMIT_KBPS:-0}
+  S3_ENDPOINT: ${S3_ENDPOINT:-}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_REGION: ${S3_REGION:-us-east-1}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  OUTBOUND_REQUIRED: ${OUTBOUND_REQUIRED:-true}
+  XRAY_SOCKS_URL: ${XRAY_SOCKS_URL:-socks5h://xray:1080}
+  YTDLP_PROXY_URL: ${YTDLP_PROXY_URL:-}
+  GALLERY_DL_PROXY_URL: ${GALLERY_DL_PROXY_URL:-}
+  DIRECT_DOWNLOAD_PROXY_URL: ${DIRECT_DOWNLOAD_PROXY_URL:-}
+  NO_PROXY: ${NO_PROXY:-127.0.0.1,localhost,postgres,redis,xray,telegram-bot-api}
+  DOMAIN_ALLOWLIST: ${DOMAIN_ALLOWLIST:-}
+  DOMAIN_DENYLIST: ${DOMAIN_DENYLIST:-}
+  MAX_REDIRECTS: ${MAX_REDIRECTS:-5}
+  RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-30}
+  ADMIN_SESSION_TTL_HOURS: ${ADMIN_SESSION_TTL_HOURS:-12}
+  CORS_ORIGINS: ${CORS_ORIGINS:-https://sharetube.appswire.ru}
+  SENTRY_DSN: ${SENTRY_DSN:-}
+  PROMETHEUS_ENABLED: ${PROMETHEUS_ENABLED:-false}
 
 x-app-image: &app-image
   build:
     context: .
     dockerfile: apps/backend/Dockerfile
   image: sharetube-app:latest
-  env_file: .env
+  environment: *app-env
   restart: unless-stopped
 
 services:
